@@ -18,6 +18,7 @@ client = pymongo.MongoClient(config["MONGODB_CONNECTION"], tlsCAFile=ca)
 db = client["ClimbingWeather"]
 collection = db["weatherdata"]
 
+
 def get_sensor_data(sensor_messages):
     temperature, humidity = None, None
     for message in sensor_messages:
@@ -27,14 +28,28 @@ def get_sensor_data(sensor_messages):
             humidity = message["measurementValue"]
     return format_weatherdata("Sensor", temperature, humidity)
 
+#Get weatherdara from openweathermap api
 def get_openweather_data(lat, lon):
-    return format_weatherdata("OpenWeatherMap", -1, 50)
+    api_endpoint = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "appid": config["OPENWEATHER_KEY"],
+        "units": "metric"
+    }
 
+    weather_data = requests.get(api_endpoint, params=params).json()
+
+    return format_weatherdata("OpenWeatherMap", weather_data["main"]["temp"], weather_data["main"]["humidity"])
+
+#SMHI and YRNO to be implemented
 def get_smhi_data(lat, lon):
     return format_weatherdata("SMHI", -2, 50)
 
 def get_yrno_data(lat, lon):
     return format_weatherdata("YRNO", -3, 50)
+
+
 
 def format_weatherdata(source, temperature, humidity):
     return {"source": source, "temperature": temperature, "humidity": humidity}
@@ -45,15 +60,13 @@ def payload_handler(sensor_payload):
     sensor_lat = sensor_payload["uplink_message"]["locations"]["user"]["latitude"]
     sensor_lon = sensor_payload["uplink_message"]["locations"]["user"]["longitude"]
 
-    weather_sources = [get_openweather_data, get_smhi_data, get_yrno_data]
-
     db_item = {
         "datetime": datetime.utcnow(),
         "location": {
             "lat": sensor_lat,
             "lon": sensor_lon
         },
-        "weather_data": [get_sensor_data(sensor_data), get_openweather_data(sensor_lat, sensor_lon), get_smhi_data(sensor_lat, sensor_lon), get_yrno_data(sensor_lat, sensor_lon)]
+        "weather_data": [get_sensor_data(sensor_data), get_openweather_data(sensor_lat, sensor_lon)]
     }
 
     print(db_item)
@@ -74,9 +87,8 @@ def on_subscribe(mqttc, obj, mid, granted_qos):
     print("\nSubscribe: " + str(mid) + " " + str(granted_qos))
 
 
-
+#Setup mqtt client and connect securley with tls to TTN Server.
 mqttc = mqtt.Client()
-
 
 mqttc.on_connect = on_connect
 mqttc.on_subscribe = on_subscribe
@@ -86,16 +98,10 @@ mqttc.on_message = on_message
 
 mqttc.username_pw_set(config["MQTT_USERNAME"], config["MQTT_PASSWORD"])
 
-
-
-mqttc.tls_set(ca)	# default certification authority of the system
-
+mqttc.tls_set(ca)	
 
 mqttc.connect(config["MQTT_SERVER"], 8883, 60)
 
-
-
 mqttc.subscribe("v3/+/devices/+/up", 0)	# all device uplinks
-
 
 mqttc.loop_forever()
