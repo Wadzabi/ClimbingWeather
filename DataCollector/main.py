@@ -26,7 +26,7 @@ def get_sensor_data(sensor_messages):
             temperature = message["measurementValue"]
         elif message["measurementId"] == humidity_measurement_Id:
             humidity = message["measurementValue"]
-    return format_weatherdata("Sensor", temperature, humidity)
+    return format_weatherdata(temperature, humidity)
 
 #Get weatherdara from openweathermap api
 def get_openweather_data(lat, lon):
@@ -40,19 +40,19 @@ def get_openweather_data(lat, lon):
 
     weather_data = requests.get(api_endpoint, params=params).json()
 
-    return format_weatherdata("OpenWeatherMap", weather_data["main"]["temp"], weather_data["main"]["humidity"])
+    return format_weatherdata(weather_data["main"]["temp"], weather_data["main"]["humidity"])
 
 #SMHI and YRNO to be implemented
 def get_smhi_data(lat, lon):
-    return format_weatherdata("SMHI", -2, 50)
+    return format_weatherdata(-2, 50)
 
 def get_yrno_data(lat, lon):
-    return format_weatherdata("YRNO", -3, 50)
+    return format_weatherdata(-3, 50)
 
 
 
-def format_weatherdata(source, temperature, humidity):
-    return {"source": source, "temperature": temperature, "humidity": humidity}
+def format_weatherdata(temperature, humidity):
+    return {"temperature": temperature, "humidity": humidity}
 
 
 def payload_handler(sensor_payload):
@@ -66,7 +66,8 @@ def payload_handler(sensor_payload):
             "lat": sensor_lat,
             "lon": sensor_lon
         },
-        "weather_data": [get_sensor_data(sensor_data), get_openweather_data(sensor_lat, sensor_lon)]
+        "sensor": get_sensor_data(sensor_data),
+        "openweather": get_openweather_data(sensor_lat, sensor_lon)
     }
 
     print(db_item)
